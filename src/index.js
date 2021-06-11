@@ -56,9 +56,24 @@ class Table extends React.Component {
     this.btnSearchClick();
     const pag = document.getElementById("ulPagination");
     pag.addEventListener('click', this.SwitchPage);
+    const component = this;
+
+    //點空白處可關閉modal
+    let modal = document.getElementById('myModal')
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) {
+        component.CloseModalClick();
+      }
+    })
+    //enter 查詢
+    window.addEventListener('keyup', function (e) {
+      if (e.key === "Enter") {
+        component.btnSearchClick();
+      }
+    });
   }
   btnSearchClick() {
-    var name = document.getElementById("txtName").value;
+    var name = document.getElementById("txtName").value.toUpperCase();
     var component = this;
     const request = require('request');
     var condition = 'all';//default
@@ -72,8 +87,17 @@ class Table extends React.Component {
       console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
 
       if (response.statusCode === 200) {
-        var json = JSON.parse(body);
-        json.sort(function (a, b) {
+        let json = JSON.parse(body);
+        let filterJson = [];
+
+        for (var j in json) {
+          // console.log(json[j].name + ':' + name + '---' + json[j].name.includes(name))
+          if (json[j].name.toUpperCase().includes(name)) {
+            filterJson.push(json[j]);
+          }
+        }
+
+        filterJson.sort(function (a, b) {
           var nameA = a.name.toUpperCase(); // ignore upper and lowercase
           var nameB = b.name.toUpperCase(); // ignore upper and lowercase
           if (nameA < nameB) {
@@ -87,14 +111,14 @@ class Table extends React.Component {
           return 0;
         });
         if (component.state.SortingClass == "fa fa-sort-alpha-desc") {
-          json = json.reverse();
+          filterJson = filterJson.reverse();
         }
         component.setState({
-          Countries: json,
+          Countries: filterJson,
           CurrentPage: 1,
           //ShowingCountries: json
         });
-        component.Pagination(json);
+        component.Pagination();
       } else {
         component.setState({
           Countries: null,
@@ -129,17 +153,19 @@ class Table extends React.Component {
             if (title === "translations") {
               Content += '<td>';
               for (var subcol in json[title]) {
-                Content += '<label">' + subcol + ':' + json[title][subcol] + ' </label>';
+                Content += '<label">' + subcol + ':' + json[title][subcol] + ', </label>';
               }
+              Content = Content.replace(/, <\/label>\s*$/, "<\/label>");
               Content += '</td>';
             } else {
               Content += '<td>';
               json[title].forEach(e => {
                 for (var subcol in e) {
-                  Content += '<label">' + subcol + ':' + e[subcol] + ' </label>';
+                  Content += '<label">' + subcol + ':' + e[subcol] + ', </label>';
                   // Content += subcol + ':' + e[subcol];
                   //   Content += ',';
                 }
+                Content = Content.replace(/, <\/label>\s*$/, "<\/label>");
               });
               Content += '</td>';
             }
@@ -174,12 +200,11 @@ class Table extends React.Component {
     else {
       this.setState({ SortingClass: "fa fa-sort-alpha-asc" });
     }
-    // console.log(this.state.countries);//table
-    //console.log(e);//event
-    //.reverse()
-    this.setState({
-      "Countries": this.state.Countries.reverse()
-    });
+    if (this.state.Countries != null) {
+      this.setState({
+        "Countries": this.state.Countries.reverse()
+      });
+    }
 
     this.Pagination();
   }
@@ -187,7 +212,7 @@ class Table extends React.Component {
   Pagination() {
     let Data = [];
     const Countries = this.state.Countries
-    const CountriesCount = Countries.length;//資料總數
+    const CountriesCount = Countries == null ? 0 : Countries.length;//資料總數
     const PerPage = 25;//每頁筆數
     const PageCount = Math.ceil(CountriesCount / PerPage);//頁面總數
     const CurrentPage = this.state.CurrentPage;
@@ -205,38 +230,39 @@ class Table extends React.Component {
       Data.push(Countries[i]);
     }
 
-    console.log(Data);
     this.setState({
       ShowingCountries: Data
     });
 
     let pageHtml = '';
-    if (CurrentPage !== 1) {
-      pageHtml += '<li><a href="#" page=prev><</a></li>';
-    }
-
-    let MinPage = 1;
-    if (CurrentPage > 6) {
-      MinPage = CurrentPage - 5;
-    }
-
-    let MaxPage = MinPage + 9;
-    if (MaxPage > PageCount) {
-      MaxPage = PageCount;
-    }
-
-    for (let i = MinPage; i < MaxPage + 1; i++) {
-      if (CurrentPage == i) {
-        pageHtml += '<li><a class="active" href="#" page=' + i + '>' + (i) + '</a></li>';
-      } else {
-        pageHtml += '<li><a href="#" page=' + i + '>' + (i) + '</a></li>';
+    if (Data.length != 0) {
+      if (CurrentPage != 1) {
+        pageHtml += '<li><a href="#" page=prev><</a></li>';
       }
-    };
 
-    //有下一頁
-    if (CurrentPage != PageCount) {
-      pageHtml += '<li><a href="#" page=next>></a></li>';
-      // pageHtml += '<li class="page-item disabled"><span class="page-link">Next</span></li>';
+      let MinPage = 1;
+      if (CurrentPage > 6) {
+        MinPage = CurrentPage - 5;
+      }
+
+      let MaxPage = MinPage + 9;
+      if (MaxPage > PageCount) {
+        MaxPage = PageCount;
+      }
+
+      for (let i = MinPage; i < MaxPage + 1; i++) {
+        if (CurrentPage == i) {
+          pageHtml += '<li><a class="active" href="#" page=' + i + '>' + (i) + '</a></li>';
+        } else {
+          pageHtml += '<li><a href="#" page=' + i + '>' + (i) + '</a></li>';
+        }
+      };
+
+      //有下一頁
+      if (CurrentPage != PageCount) {
+        pageHtml += '<li><a href="#" page=next>></a></li>';
+        // pageHtml += '<li class="page-item disabled"><span class="page-link">Next</span></li>';
+      }
     }
 
     document.getElementById("ulPagination").innerHTML = pageHtml;
@@ -255,9 +281,10 @@ class Table extends React.Component {
 
     this.setState({ CurrentPage: currentPage })
     this.Pagination();
+    window.scroll(0, 0);
   }
   RenderTableData() {
-    if (this.state.ShowingCountries == null) {
+    if (this.state.ShowingCountries == null || this.state.ShowingCountries.length == 0) {
       return (
         <tr>
           <td colSpan="7">查無資料</td>
@@ -266,6 +293,11 @@ class Table extends React.Component {
     } else {
       return this.state.ShowingCountries.map((country) => {
         const { flag, name, alpha2Code, alpha3Code, nativeName, altSpellings, callingCodes } = country //destructuring
+        let altSpelling = '';
+        altSpellings.forEach(e => {
+          altSpelling += (e + ', ');
+        });
+        altSpelling = altSpelling.replace(/, \s*$/, "");
         return (
           <tr key={name}>
             <td><img src={flag} alt={name} className="tdimage" /></td>
@@ -273,7 +305,7 @@ class Table extends React.Component {
             <td>{alpha2Code}</td>
             <td>{alpha3Code}</td>
             <td>{nativeName}</td>
-            <td>{altSpellings}</td>
+            <td>{altSpelling}</td>
             <td>{callingCodes}</td>
           </tr>
         )
